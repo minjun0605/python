@@ -1,0 +1,188 @@
+# -*- coding: utf-8 -*-
+# UTF-8 encoding when using korean
+# (한글 주석/문자열이 깨지지 않도록 UTF-8 인코딩을 명시)
+
+class Customer:
+    """
+    [Customer 클래스]
+    - 한 명(또는 한 팀)의 예약 요청 정보를 담는 객체
+
+    멤버 변수
+    - id            : 고객(팀) 식별 번호
+    - time          : 예약 시간(0~23 사이 정수)
+    - num_of_people : 예약 인원 수
+    """
+    def __init__(self, id, time, num_of_people):
+        self.id = id
+        self.time = time
+        self.num_of_people = num_of_people
+
+
+class Shop:
+    """
+    [Shop 클래스] (부모 클래스 / 공통 기능 제공)
+    - HairShop(미용실), Restaurant(레스토랑)의 공통 부모 클래스
+
+    멤버 변수
+    - reserve_list : 예약이 "성공한 고객 목록"을 저장하는 리스트
+
+    메서드
+    - reserve(customer) : 예약을 받는 기본 동작
+      (부모 클래스에서는 그냥 추가하고 True를 반환하지만,
+       자식 클래스에서 규칙에 따라 override(재정의)하여 사용)
+    """
+    def __init__(self):
+        # 예약 성공한 고객 목록을 저장
+        self.reserve_list = []
+
+    def reserve(self, customer):
+        """
+        [기본 예약 처리]
+        - 어떤 조건도 검사하지 않고 바로 예약 리스트에 추가
+        - True 반환
+
+        ※ 실제 문제에서는 HairShop, Restaurant에서 규칙을 적용해야 하므로
+          이 함수는 자식 클래스에서 override해서 사용한다.
+        """
+        self.reserve_list.append(customer)
+        return True
+
+
+class HairShop(Shop):
+    """
+    [HairShop 클래스] (미용실)
+    - Shop을 상속받아 reserve_list를 그대로 사용
+    - 미용실 예약 규칙:
+      1) 인원수가 1명이어야만 예약 가능
+      2) 다른 손님과 예약 시간이 겹칠 수 없음(같은 time 불가)
+    """
+    def __init__(self):
+        # 부모(Shop) 초기화: reserve_list 생성
+        super().__init__()
+
+    def reserve(self, customer):
+        """
+        [미용실 예약 처리]
+        - 규칙에 맞으면 reserve_list에 추가 후 True
+        - 규칙에 맞지 않으면 False
+        """
+
+        # (규칙 1) 인원수가 1명이 아니면 예약 불가
+        if customer.num_of_people != 1:
+            return False
+
+        # (규칙 2) 기존 예약들과 시간이 겹치면 예약 불가
+        # reserve_list에는 이미 예약이 확정된 Customer들이 들어 있음
+        for r in self.reserve_list:
+            # 같은 시간(time)이면 겹치는 것이므로 예약 불가
+            if r.time == customer.time:
+                return False
+
+        # 위 조건을 모두 통과하면 예약 성공 → 리스트에 추가
+        self.reserve_list.append(customer)
+        return True
+
+
+class Restaurant(Shop):
+    """
+    [Restaurant 클래스] (레스토랑)
+    - Shop을 상속받아 reserve_list 사용
+    - 레스토랑 예약 규칙:
+      1) 인원수가 2명 이상 8명 이하일 때만 예약 가능
+      2) 같은 시간대에 예약은 최대 2팀까지만 가능(겹쳐도 2팀까지 허용)
+    """
+    def __init__(self):
+        # 부모(Shop) 초기화: reserve_list 생성
+        super().__init__()
+
+    def reserve(self, customer):
+        """
+        [레스토랑 예약 처리]
+        - 규칙에 맞으면 reserve_list에 추가 후 True
+        - 규칙에 맞지 않으면 False
+        """
+
+        # (규칙 1) 인원 2~8명 범위를 벗어나면 예약 불가
+        if customer.num_of_people < 2 or customer.num_of_people > 8:
+            return False
+
+        # (규칙 2) 같은 시간대 예약 팀 수를 세어본다.
+        count = 0
+        for r in self.reserve_list:
+            if r.time == customer.time:
+                count += 1
+
+        # 이미 같은 시간 예약이 2팀 이상이면 이번 예약은 불가
+        if count >= 2:
+            return False
+
+        # 조건 통과 → 예약 성공
+        self.reserve_list.append(customer)
+        return True
+
+
+def solution(customers, shops):
+    """
+    [solution 함수]
+    입력:
+    - customers : 고객 예약 요청 리스트
+      예) [[id, time, num_of_people], ...]
+    - shops     : 각 고객이 예약하려는 가게 종류 리스트
+      예) ["hairshop", "restaurant", ...]
+
+    처리:
+    - customers와 shops는 같은 길이이며, i번째 고객은 shops[i] 가게에 예약을 시도한다.
+    - 예약 규칙을 만족하여 "예약 성공"하면 카운트 +1
+    - 최종적으로 두 가게에서 성공한 예약 건수 총합을 반환한다.
+
+    반환:
+    - 예약 성공 횟수(정수)
+    """
+
+    # 실제 운영 중인 미용실/레스토랑 객체를 각각 1개씩 만든다.
+    # (여기에 reserve_list가 쌓이며, 이후 예약 판단에 영향을 준다.)
+    hairshop = HairShop()
+    restaurant = Restaurant()
+
+    # 예약 성공 횟수
+    count = 0
+
+    # zip으로 같은 인덱스의 고객 정보와 가게 정보를 묶어서 순서대로 처리
+    for customer, shop in zip(customers, shops):
+
+        # customer는 [id, time, num] 형태의 리스트이므로 Customer 객체로 변환
+        c_obj = Customer(customer[0], customer[1], customer[2])
+
+        # shops[i] 값에 따라 해당 가게의 reserve를 호출
+        if shop == "hairshop":
+            # 미용실 예약 시도 → 성공하면 True, 실패하면 False
+            if hairshop.reserve(c_obj):
+                count += 1
+
+        elif shop == "restaurant":
+            # 레스토랑 예약 시도
+            if restaurant.reserve(c_obj):
+                count += 1
+
+        # shop은 문제 조건상 "hairshop" 또는 "restaurant"만 들어온다고 했으므로
+        # else 처리는 생략 가능
+
+    # 최종 예약 성공 횟수 반환
+    return count
+
+
+# ------------------------------------------------------------
+# [테스트 코드] (문제 예시)
+# ------------------------------------------------------------
+customers = [
+    [1000, 2, 1],   # 1000번 고객: 2시, 1명
+    [2000, 2, 4],   # 2000번 고객: 2시, 4명
+    [1234, 5, 1],   # 1234번 고객: 5시, 1명
+    [4321, 2, 1],   # 4321번 고객: 2시, 1명
+    [1111, 3, 10]   # 1111번 고객: 3시, 10명
+]
+shops = ["hairshop", "restaurant", "hairshop", "hairshop", "restaurant"]
+
+ret = solution(customers, shops)
+print("solution 함수의 반환 값은", ret, "입니다.")
+# 예시 해설 기준: 최종 반환값은 3
